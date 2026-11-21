@@ -1,16 +1,7 @@
 # frozen_string_literal: true
 
 class SalaryAnalyticsService
-  USD_SALARY_EXPR = <<~SQL.squish
-    (annual_salary * (CASE currency
-      WHEN 'USD' THEN 1.0
-      WHEN 'GBP' THEN 1.28
-      WHEN 'EUR' THEN 1.08
-      WHEN 'SGD' THEN 0.74
-      WHEN 'INR' THEN 0.012
-      ELSE 1.0
-    END))
-  SQL
+  USD_SALARY_EXPR = CurrencyConverter.sql_usd_expr.freeze
 
   BAND_EXPR = <<~SQL.squish
     CASE
@@ -30,21 +21,26 @@ class SalaryAnalyticsService
     '$200k+'
   ].freeze
 
-  def initialize(department: nil, country: nil)
+  def initialize(department: nil, country: nil, currency: nil)
     @department = department
     @country = country
+    @currency = currency
   end
 
   def call
     scope = Employee.all
     scope = scope.where(department: @department) if @department.present?
     scope = scope.where(country: @country) if @country.present?
+    scope = scope.where(currency: @currency) if @currency.present?
 
     total_employees = scope.count
 
+    active_currency = @currency || (@country.present? ? scope.pick(:currency) : nil) || 'USD'
+    currency_symbol = CurrencyConverter.symbol(active_currency)
+
     if total_employees.zero?
       return {
-        summary: empty_summary,
+        summary: empty_summary(active_currency, currency_symbol),
         department_breakdown: [],
         country_breakdown: [],
         salary_bands: empty_bands
@@ -57,14 +53,27 @@ class SalaryAnalyticsService
     min_salary_usd = scope.minimum(Arel.sql(USD_SALARY_EXPR)).to_f.round(2)
     max_salary_usd = scope.maximum(Arel.sql(USD_SALARY_EXPR)).to_f.round(2)
 
+    total_payroll_local = scope.sum(:annual_salary).to_f.round(2)
+    avg_salary_local = (total_payroll_local / total_employees).round(2)
+    min_salary_local = scope.minimum(:annual_salary).to_f.round(2)
+    max_salary_local = scope.maximum(:annual_salary).to_f.round(2)
+    median_salary_local = calculate_local_median(scope, total_employees)
+
     {
       summary: {
         total_employees: total_employees,
+        currency: active_currency,
+        currency_symbol: currency_symbol,
         total_payroll_usd: total_payroll_usd,
         average_salary_usd: avg_salary_usd,
         median_salary_usd: median_salary_usd,
         min_salary_usd: min_salary_usd,
-        max_salary_usd: max_salary_usd
+        max_salary_usd: max_salary_usd,
+        total_payroll_local: total_payroll_local,
+        average_salary_local: avg_salary_local,
+        median_salary_local: median_salary_local,
+        min_salary_local: min_salary_local,
+        max_salary_local: max_salary_local
       },
       department_breakdown: calculate_department_breakdown(scope),
       country_breakdown: calculate_country_breakdown(scope),
@@ -83,6 +92,19 @@ class SalaryAnalyticsService
       val.to_f.round(2)
     else
       vals = scope.order(Arel.sql(USD_SALARY_EXPR)).offset(offset).limit(2).pluck(Arel.sql(USD_SALARY_EXPR))
+      (vals.sum.to_f / 2.0).round(2)
+    end
+  end
+
+  def calculate_local_median(scope, count)
+    return 0.0 if count.zero?
+
+    offset = (count - 1) / 2
+    if count.odd?
+      val = scope.order(:annual_salary).offset(offset).limit(1).pick(:annual_salary)
+      val.to_f.round(2)
+    else
+      vals = scope.order(:annual_salary).offset(offset).limit(2).pluck(:annual_salary)
       (vals.sum.to_f / 2.0).round(2)
     end
   end
@@ -125,6 +147,7 @@ class SalaryAnalyticsService
       {
         country: country,
         currency: currency,
+        currency_symbol: CurrencyConverter.symbol(currency),
         headcount: headcount,
         total_payroll_usd: total_f,
         average_salary_usd: avg_f,
@@ -147,14 +170,21 @@ class SalaryAnalyticsService
     end
   end
 
-  def empty_summary
+  def empty_summary(currency = 'USD', symbol = '$')
     {
       total_employees: 0,
+      currency: currency,
+      currency_symbol: symbol,
       total_payroll_usd: 0.0,
       average_salary_usd: 0.0,
       median_salary_usd: 0.0,
       min_salary_usd: 0.0,
-      max_salary_usd: 0.0
+      max_salary_usd: 0.0,
+      total_payroll_local: 0.0,
+      average_salary_local: 0.0,
+      median_salary_local: 0.0,
+      min_salary_local: 0.0,
+      max_salary_local: 0.0
     }
   end
 

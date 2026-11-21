@@ -70,7 +70,6 @@ class Employee < ApplicationRecord
   end
 
   def annual_salary_usd
-    rate = EXCHANGE_RATES[currency] || 1.0
-    (annual_salary.to_f * rate).round(2)
+    CurrencyConverter.to_usd(annual_salary, currency)
   end
 end

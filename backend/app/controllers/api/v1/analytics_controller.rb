@@ -6,7 +6,8 @@ module Api
       def overview
         data = SalaryAnalyticsService.new(
           department: params[:department],
-          country: params[:country]
+          country: params[:country],
+          currency: params[:currency]
         ).call
 
         render json: data

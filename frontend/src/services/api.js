@@ -16,9 +16,34 @@ export const COUNTRY_CURRENCIES = {
   'Singapore': 'SGD'
 };
 
+export const CURRENCY_TO_COUNTRY = {
+  USD: 'United States',
+  GBP: 'United Kingdom',
+  EUR: 'Germany',
+  INR: 'India',
+  SGD: 'Singapore'
+};
+
+export const RATES_TO_USD = {
+  USD: 1.0,
+  GBP: 1.28,
+  EUR: 1.08,
+  SGD: 0.74,
+  INR: 0.012
+};
+
+export const SUPPORTED_CURRENCIES = [
+  { code: 'USD', symbol: '$', label: 'USD ($) - US Dollar' },
+  { code: 'GBP', symbol: '£', label: 'GBP (£) - British Pound' },
+  { code: 'EUR', symbol: '€', label: 'EUR (€) - Euro' },
+  { code: 'INR', symbol: '₹', label: 'INR (₹) - Indian Rupee' },
+  { code: 'SGD', symbol: 'S$', label: 'SGD (S$) - Singapore Dollar' }
+];
+
 export const formatCurrency = (amount, currency = 'USD') => {
   if (amount == null || isNaN(amount)) return '-';
-  const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
+  const cleanCode = String(currency || 'USD').toUpperCase();
+  const symbol = CURRENCY_SYMBOLS[cleanCode] || cleanCode + ' ';
   return `${symbol}${Number(amount).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
@@ -27,11 +52,24 @@ export const formatCurrency = (amount, currency = 'USD') => {
 
 export const formatUSD = (amount) => formatCurrency(amount, 'USD');
 
+export const convertFromUSD = (amountUSD, targetCurrency = 'USD') => {
+  if (amountUSD == null || isNaN(amountUSD)) return 0;
+  const rate = RATES_TO_USD[targetCurrency] || 1.0;
+  return amountUSD / rate;
+};
+
+export const convertToUSD = (localAmount, fromCurrency = 'USD') => {
+  if (localAmount == null || isNaN(localAmount)) return 0;
+  const rate = RATES_TO_USD[fromCurrency] || 1.0;
+  return localAmount * rate;
+};
+
 export const api = {
   async getAnalytics(params = {}) {
     const query = new URLSearchParams();
     if (params.department) query.append('department', params.department);
     if (params.country) query.append('country', params.country);
+    if (params.currency) query.append('currency', params.currency);
 
     const res = await fetch(`${API_BASE_URL}/analytics/overview?${query.toString()}`);
     if (!res.ok) throw new Error(`Failed to fetch analytics: ${res.statusText}`);
@@ -45,6 +83,7 @@ export const api = {
     if (params.search) query.append('search', params.search);
     if (params.department) query.append('department', params.department);
     if (params.country) query.append('country', params.country);
+    if (params.currency) query.append('currency', params.currency);
     if (params.sort_by) query.append('sort_by', params.sort_by);
     if (params.sort_order) query.append('sort_order', params.sort_order);
 

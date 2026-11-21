@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
-  Filter, 
   UserPlus, 
   ArrowUpDown, 
   ArrowUp, 
@@ -11,11 +10,15 @@ import {
   ChevronLeft, 
   ChevronRight,
   RotateCcw,
-  Building2,
-  Globe2,
-  Calendar
+  ChevronDown
 } from 'lucide-react';
-import { api, formatCurrency, formatUSD } from '../services/api';
+import { 
+  api, 
+  formatCurrency, 
+  formatUSD, 
+  CURRENCY_SYMBOLS, 
+  COUNTRY_CURRENCIES 
+} from '../services/api';
 
 const DEPT_BADGE_COLORS = {
   'Engineering': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -47,6 +50,7 @@ export default function EmployeeDirectory({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [showInUSD, setShowInUSD] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
 
@@ -84,6 +88,11 @@ export default function EmployeeDirectory({
     loadEmployees();
   }, [loadEmployees]);
 
+  const handleCountryFilterChange = (country) => {
+    setSelectedCountry(country);
+    setPagination((prev) => ({ ...prev, current_page: 1 }));
+  };
+
   const handleSort = (column) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -105,6 +114,7 @@ export default function EmployeeDirectory({
     setDebouncedSearch('');
     setSelectedDept('');
     setSelectedCountry('');
+    setShowInUSD(false);
     setSortBy('name');
     setSortOrder('asc');
     setPagination((prev) => ({ ...prev, current_page: 1 }));
@@ -121,8 +131,8 @@ export default function EmployeeDirectory({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Control Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Simple Control Bar */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -135,39 +145,65 @@ export default function EmployeeDirectory({
           />
         </div>
 
-        {/* Filters & Action Button */}
+        {/* Filters, Single USD Toggle & Add Employee Button */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Department Filter */}
-          <select
-            value={selectedDept}
-            onChange={(e) => {
-              setSelectedDept(e.target.value);
-              setPagination((p) => ({ ...p, current_page: 1 }));
-            }}
-            className="text-xs font-medium border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">All Departments</option>
-            {filterOptions?.departments?.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+          {/* Department Filter with centered dropdown icon */}
+          <div className="relative inline-block">
+            <select
+              value={selectedDept}
+              onChange={(e) => {
+                setSelectedDept(e.target.value);
+                setPagination((p) => ({ ...p, current_page: 1 }));
+              }}
+              className="appearance-none text-xs font-medium border border-slate-300 rounded-xl pl-3 pr-8 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs"
+            >
+              <option value="">All Departments</option>
+              {filterOptions?.departments?.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
 
-          {/* Country Filter */}
-          <select
-            value={selectedCountry}
-            onChange={(e) => {
-              setSelectedCountry(e.target.value);
-              setPagination((p) => ({ ...p, current_page: 1 }));
-            }}
-            className="text-xs font-medium border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">All Countries</option>
-            {filterOptions?.countries?.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          {/* Jurisdiction Filter with centered dropdown icon */}
+          <div className="relative inline-block">
+            <select
+              value={selectedCountry}
+              onChange={(e) => handleCountryFilterChange(e.target.value)}
+              className="appearance-none text-xs font-bold border border-sky-300 rounded-xl pl-3 pr-8 py-2 bg-sky-50 text-sky-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs"
+            >
+              <option value="">All Countries (Global)</option>
+              {filterOptions?.countries?.map((c) => {
+                const cur = COUNTRY_CURRENCIES[c] || 'USD';
+                const sym = CURRENCY_SYMBOLS[cur] || '$';
+                return (
+                  <option key={c} value={c}>
+                    {c} ({sym} {cur})
+                  </option>
+                );
+              })}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-sky-600">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
 
-          {(searchTerm || selectedDept || selectedCountry) && (
+          {/* Universal USD Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setShowInUSD(!showInUSD)}
+            className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+              showInUSD
+                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {showInUSD ? 'Viewing in USD ($)' : 'Convert to USD ($)'}
+          </button>
+
+          {(searchTerm || selectedDept || selectedCountry || showInUSD) && (
             <button
               onClick={handleResetFilters}
               title="Reset all filters"
@@ -179,7 +215,7 @@ export default function EmployeeDirectory({
 
           {/* Add Employee Button */}
           <button
-            onClick={onAddEmployee}
+            onClick={() => onAddEmployee(selectedCountry)}
             className="flex items-center space-x-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all"
           >
             <UserPlus className="w-4 h-4" />
@@ -192,7 +228,7 @@ export default function EmployeeDirectory({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th scope="col" className="px-6 py-3.5">
                   <button 
@@ -213,12 +249,12 @@ export default function EmployeeDirectory({
                     {renderSortIcon('department')}
                   </button>
                 </th>
-                <th scope="col" className="px-6 py-3.5">
+                <th scope="col" className="px-6 py-3.5 whitespace-nowrap">
                   <button 
                     onClick={() => handleSort('country')}
                     className="group flex items-center space-x-1.5 focus:outline-none"
                   >
-                    <span>Location</span>
+                    <span>Jurisdiction</span>
                     {renderSortIcon('country')}
                   </button>
                 </th>
@@ -227,7 +263,7 @@ export default function EmployeeDirectory({
                     onClick={() => handleSort('annual_salary')}
                     className="group inline-flex items-center space-x-1.5 focus:outline-none"
                   >
-                    <span>Compensation</span>
+                    <span>{showInUSD ? 'Salary (USD $)' : 'Salary (Native)'}</span>
                     {renderSortIcon('annual_salary')}
                   </button>
                 </th>
@@ -245,7 +281,6 @@ export default function EmployeeDirectory({
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {loading ? (
-                // Skeleton loading state
                 Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="px-6 py-4">
@@ -270,6 +305,8 @@ export default function EmployeeDirectory({
               ) : (
                 employees.map((emp) => {
                   const badgeColor = DEPT_BADGE_COLORS[emp.department] || 'bg-slate-100 text-slate-700';
+                  const sym = CURRENCY_SYMBOLS[emp.currency?.toUpperCase()] || '$';
+
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
                       {/* Name & Email */}
@@ -290,25 +327,40 @@ export default function EmployeeDirectory({
                         </span>
                       </td>
 
-                      {/* Country & Currency */}
-                      <td className="px-6 py-3.5 text-slate-700">
-                        <div className="flex items-center space-x-1.5">
+                      {/* Country & Native Currency */}
+                      <td className="px-6 py-3.5 text-slate-700 whitespace-nowrap">
+                        <div className="flex items-center space-x-2 whitespace-nowrap">
                           <span className="font-medium">{emp.country}</span>
-                          <span className="text-[10px] bg-slate-100 text-slate-600 px-1 rounded font-mono">
-                            {emp.currency}
+                          <span className="inline-flex items-center whitespace-nowrap text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md font-mono font-bold border border-slate-200 shrink-0">
+                            {sym}&nbsp;{emp.currency}
                           </span>
                         </div>
                       </td>
 
-                      {/* Compensation (Native & USD Normalized) */}
-                      <td className="px-6 py-3.5 text-right">
-                        <div className="font-bold text-slate-900">
-                          {formatCurrency(emp.annual_salary, emp.currency)}
-                        </div>
-                        {emp.currency !== 'USD' && (
-                          <div className="text-xs text-slate-500 font-medium">
-                            ≈ {formatUSD(emp.annual_salary_usd)} USD
-                          </div>
+                      {/* Compensation (respects USD vs Native mode) */}
+                      <td className="px-6 py-3.5 text-right font-mono">
+                        {showInUSD ? (
+                          <>
+                            <div className="font-extrabold text-slate-900">
+                              {formatUSD(emp.annual_salary_usd)}
+                            </div>
+                            {emp.currency !== 'USD' && (
+                              <div className="text-xs text-slate-500 font-medium">
+                                Native: {formatCurrency(emp.annual_salary, emp.currency)}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-extrabold text-slate-900">
+                              {formatCurrency(emp.annual_salary, emp.currency)}
+                            </div>
+                            {emp.currency !== 'USD' && (
+                              <div className="text-xs text-slate-500 font-medium">
+                                ≈ {formatUSD(emp.annual_salary_usd)} USD
+                              </div>
+                            )}
+                          </>
                         )}
                       </td>
 
@@ -353,18 +405,23 @@ export default function EmployeeDirectory({
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Per-Page Select */}
+            {/* Per-Page Select with centered icon and right padding */}
             <div className="flex items-center space-x-1.5 text-xs text-slate-600">
               <span>Rows per page:</span>
-              <select
-                value={pagination.per_page}
-                onChange={(e) => setPagination((prev) => ({ ...prev, per_page: Number(e.target.value), current_page: 1 }))}
-                className="border border-slate-300 rounded-lg px-2 py-1 bg-white text-slate-700 text-xs focus:ring-1 focus:ring-sky-500"
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+              <div className="relative inline-block">
+                <select
+                  value={pagination.per_page}
+                  onChange={(e) => setPagination((prev) => ({ ...prev, per_page: Number(e.target.value), current_page: 1 }))}
+                  className="appearance-none border border-slate-300 rounded-lg pl-2.5 pr-7 py-1 bg-white text-slate-700 text-xs focus:ring-1 focus:ring-sky-500 cursor-pointer shadow-xs"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-slate-400">
+                  <ChevronDown className="w-3 h-3" />
+                </div>
+              </div>
             </div>
 
             {/* Page Navigation */}

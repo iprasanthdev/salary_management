@@ -14,6 +14,7 @@ module Api
         scope = Employee.all
         scope = scope.by_department(params[:department]) if params[:department].present?
         scope = scope.by_country(params[:country]) if params[:country].present?
+        scope = scope.where(currency: params[:currency]) if params[:currency].present?
         scope = scope.search(params[:search]) if params[:search].present?
         scope = scope.sorted_by(params[:sort_by], params[:sort_order])
 
@@ -31,7 +32,8 @@ module Api
           },
           filter_options: {
             departments: Employee::DEPARTMENTS,
-            countries: Employee::COUNTRIES
+            countries: Employee::COUNTRIES,
+            currencies: Employee::CURRENCIES
           }
         }
       end

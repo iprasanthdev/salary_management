@@ -60,8 +60,8 @@ export default function App() {
     initApp();
   }, [refreshTrigger]);
 
-  const handleOpenAdd = () => {
-    setModalState({ isOpen: true, employee: null });
+  const handleOpenAdd = (defaultCountry = '') => {
+    setModalState({ isOpen: true, employee: null, defaultCountry });
   };
 
   const handleOpenEdit = (emp) => {
@@ -126,7 +126,8 @@ export default function App() {
         isOpen={modalState.isOpen}
         employee={modalState.employee}
         filterOptions={filterOptions}
-        onClose={() => setModalState({ isOpen: false, employee: null })}
+        defaultCountry={modalState.defaultCountry}
+        onClose={() => setModalState({ isOpen: false, employee: null, defaultCountry: '' })}
         onSave={handleSaveEmployee}
       />
 

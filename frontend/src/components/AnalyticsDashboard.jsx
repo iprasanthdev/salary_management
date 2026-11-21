@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
-  DollarSign, 
   TrendingUp, 
   Scale, 
   ArrowUpDown, 
   Globe2, 
   Briefcase, 
-  Filter,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import {
   BarChart,
@@ -20,7 +19,14 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { api, formatUSD } from '../services/api';
+import { 
+  api, 
+  formatCurrency, 
+  formatUSD, 
+  convertFromUSD,
+  CURRENCY_SYMBOLS, 
+  COUNTRY_CURRENCIES 
+} from '../services/api';
 
 const COLORS = ['#0284c7', '#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#14b8a6'];
 
@@ -29,6 +35,7 @@ export default function AnalyticsDashboard({ filterOptions }) {
   const [data, setData] = useState(null);
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
+  const [showInUSD, setShowInUSD] = useState(false);
 
   const loadAnalytics = async () => {
     try {
@@ -49,6 +56,17 @@ export default function AnalyticsDashboard({ filterOptions }) {
     loadAnalytics();
   }, [selectedDept, selectedCountry]);
 
+  const handleCountryChange = (country) => {
+    setSelectedCountry(country);
+    setShowInUSD(false);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedDept('');
+    setSelectedCountry('');
+    setShowInUSD(false);
+  };
+
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
@@ -60,55 +78,110 @@ export default function AnalyticsDashboard({ filterOptions }) {
 
   const { summary, department_breakdown = [], country_breakdown = [], salary_bands = [] } = data || {};
 
+  const jurisdictionCurrency = selectedCountry 
+    ? (COUNTRY_CURRENCIES[selectedCountry] || 'USD') 
+    : 'USD';
+
+  const activeCurrency = (showInUSD || !selectedCountry) ? 'USD' : jurisdictionCurrency;
+  const activeSymbol = CURRENCY_SYMBOLS[activeCurrency] || '$';
+
+  const displaySpend = activeCurrency === 'USD' 
+    ? summary?.total_payroll_usd 
+    : (summary?.total_payroll_local || convertFromUSD(summary?.total_payroll_usd, activeCurrency));
+
+  const displayMean = activeCurrency === 'USD' 
+    ? summary?.average_salary_usd 
+    : (summary?.average_salary_local || convertFromUSD(summary?.average_salary_usd, activeCurrency));
+
+  const displayMedian = activeCurrency === 'USD' 
+    ? summary?.median_salary_usd 
+    : (summary?.median_salary_local || convertFromUSD(summary?.median_salary_usd, activeCurrency));
+
+  const displayMin = activeCurrency === 'USD' 
+    ? summary?.min_salary_usd 
+    : (summary?.min_salary_local || convertFromUSD(summary?.min_salary_usd, activeCurrency));
+
+  const displayMax = activeCurrency === 'USD' 
+    ? summary?.max_salary_usd 
+    : (summary?.max_salary_local || convertFromUSD(summary?.max_salary_usd, activeCurrency));
+
   return (
     <div className="space-y-8 pb-12">
       {/* Page Title & Slicing Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Compensation Intelligence</h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Compensation Intelligence</h1>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono border border-slate-200">
+              {activeSymbol} {activeCurrency}
+            </span>
+          </div>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time aggregate insights and pay equity benchmarks for executive HR decision-making.
+            Real-time compensation analytics. Selecting a country automatically switches to its currency.
           </p>
         </div>
 
-        {/* Dynamic Filters */}
+        {/* Clean, Simple Filter Bar with Centered Dropdown Icons */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Slice By:</span>
-          </div>
-          
-          <select
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            className="text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">All Departments</option>
-            {filterOptions?.departments?.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-
-          <select
-            value={selectedCountry}
-            onChange={(e) => setSelectedCountry(e.target.value)}
-            className="text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">All Jurisdictions</option>
-            {filterOptions?.countries?.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          {(selectedDept || selectedCountry) && (
-            <button
-              onClick={() => {
-                setSelectedDept('');
-                setSelectedCountry('');
-              }}
-              className="text-xs font-semibold text-sky-600 hover:text-sky-800 px-2 py-1"
+          {/* Department Filter */}
+          <div className="relative inline-block">
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="appearance-none text-xs font-medium border border-slate-300 rounded-xl pl-3 pr-8 py-2 bg-slate-50 text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs"
             >
-              Reset Filters
+              <option value="">All Departments</option>
+              {filterOptions?.departments?.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Jurisdiction Slicer */}
+          <div className="relative inline-block">
+            <select
+              value={selectedCountry}
+              onChange={(e) => handleCountryChange(e.target.value)}
+              className="appearance-none text-xs font-bold border border-sky-300 rounded-xl pl-3 pr-8 py-2 bg-sky-50 text-sky-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs"
+            >
+              <option value="">All Countries (Global)</option>
+              {filterOptions?.countries?.map((c) => {
+                const cur = COUNTRY_CURRENCIES[c] || 'USD';
+                const sym = CURRENCY_SYMBOLS[cur] || '$';
+                return (
+                  <option key={c} value={c}>
+                    {c} ({sym} {cur})
+                  </option>
+                );
+              })}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-sky-600">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Simple USD Toggle (always available) */}
+          <button
+            type="button"
+            onClick={() => setShowInUSD(!showInUSD)}
+            className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+              showInUSD
+                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {showInUSD ? 'Viewing in USD ($)' : 'Convert to USD ($)'}
+          </button>
+
+          {(selectedDept || selectedCountry || showInUSD) && (
+            <button
+              onClick={handleResetFilters}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2 py-1"
+            >
+              Reset
             </button>
           )}
         </div>
@@ -117,7 +190,7 @@ export default function AnalyticsDashboard({ filterOptions }) {
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Total Headcount */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Headcount</span>
             <div className="p-2 rounded-xl bg-sky-50 text-sky-600">
@@ -128,44 +201,50 @@ export default function AnalyticsDashboard({ filterOptions }) {
             <div className="text-3xl font-extrabold text-slate-900">
               {summary?.total_employees?.toLocaleString()}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Active global employees</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {selectedCountry ? `${selectedCountry} employees` : 'Active global workforce'}
+            </p>
           </div>
         </div>
 
         {/* Total Annual Spend */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Annual Spend</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-              <DollarSign className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold font-mono text-sm">
+              {activeSymbol}
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-3xl font-extrabold text-slate-900">
-              {formatUSD(summary?.total_payroll_usd)}
+            <div className="text-3xl font-extrabold text-slate-900 font-mono">
+              {formatCurrency(displaySpend, activeCurrency)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Normalized USD run-rate</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Total payroll in <span className="font-bold text-slate-700">{activeCurrency}</span>
+            </p>
           </div>
         </div>
 
         {/* Average Salary */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mean Salary</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Salary</span>
             <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-3xl font-extrabold text-slate-900">
-              {formatUSD(summary?.average_salary_usd)}
+            <div className="text-3xl font-extrabold text-slate-900 font-mono">
+              {formatCurrency(displayMean, activeCurrency)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Per employee / year (USD)</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Per employee / year ({activeCurrency})
+            </p>
           </div>
         </div>
 
         {/* Median Salary */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Median Salary</span>
             <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
@@ -173,11 +252,11 @@ export default function AnalyticsDashboard({ filterOptions }) {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-3xl font-extrabold text-slate-900">
-              {formatUSD(summary?.median_salary_usd)}
+            <div className="text-3xl font-extrabold text-slate-900 font-mono">
+              {formatCurrency(displayMedian, activeCurrency)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Spread: {formatUSD(summary?.min_salary_usd)} - {formatUSD(summary?.max_salary_usd)}
+            <p className="text-xs text-slate-500 mt-1 font-mono">
+              Spread: {formatCurrency(displayMin, activeCurrency)} - {formatCurrency(displayMax, activeCurrency)}
             </p>
           </div>
         </div>
@@ -230,16 +309,25 @@ export default function AnalyticsDashboard({ filterOptions }) {
 
           {/* Department Detail List */}
           <div className="mt-4 border-t border-slate-100 pt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
-            {department_breakdown.map((dept) => (
-              <div key={dept.department} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-none">
-                <span className="font-semibold text-slate-800">{dept.department}</span>
-                <div className="flex items-center space-x-4">
-                  <span className="text-slate-500">{dept.headcount} staff</span>
-                  <span className="font-medium text-slate-700">Avg: {formatUSD(dept.average_salary_usd)}</span>
-                  <span className="font-bold text-sky-700">{formatUSD(dept.total_payroll_usd)}</span>
+            {department_breakdown.map((dept) => {
+              const deptSpend = activeCurrency === 'USD' 
+                ? dept.total_payroll_usd 
+                : convertFromUSD(dept.total_payroll_usd, activeCurrency);
+              const deptAvg = activeCurrency === 'USD' 
+                ? dept.average_salary_usd 
+                : convertFromUSD(dept.average_salary_usd, activeCurrency);
+
+              return (
+                <div key={dept.department} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-none">
+                  <span className="font-semibold text-slate-800">{dept.department}</span>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-slate-500">{dept.headcount} staff</span>
+                    <span className="font-medium text-slate-700">Avg: {formatCurrency(deptAvg, activeCurrency)}</span>
+                    <span className="font-bold text-sky-700 font-mono">{formatCurrency(deptSpend, activeCurrency)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -249,9 +337,9 @@ export default function AnalyticsDashboard({ filterOptions }) {
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <Globe2 className="w-4 h-4 text-indigo-600" />
-                <span>Geographic Spend & Currency Normalization</span>
+                <span>Countries & Local Currencies</span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">International headcount and normalized spend in USD</p>
+              <p className="text-xs text-slate-500 mt-0.5">Click any country to automatically switch currency</p>
             </div>
           </div>
 
@@ -279,23 +367,39 @@ export default function AnalyticsDashboard({ filterOptions }) {
             </ResponsiveContainer>
           </div>
 
-          {/* Country Detail List */}
+          {/* Country Detail List with click-to-switch */}
           <div className="mt-4 border-t border-slate-100 pt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
-            {country_breakdown.map((c) => (
-              <div key={c.country} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-none">
-                <div className="flex items-center space-x-2">
-                  <span className="font-semibold text-slate-800">{c.country}</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-mono">
-                    {c.currency}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <span className="text-slate-500">{c.headcount} staff</span>
-                  <span className="font-medium text-slate-700">Avg USD: {formatUSD(c.average_salary_usd)}</span>
-                  <span className="font-bold text-indigo-700">{formatUSD(c.total_payroll_usd)}</span>
-                </div>
-              </div>
-            ))}
+            {country_breakdown.map((c) => {
+              const sym = CURRENCY_SYMBOLS[c.currency] || '$';
+              const isSelected = selectedCountry === c.country;
+
+              return (
+                <button
+                  key={c.country}
+                  type="button"
+                  onClick={() => handleCountryChange(c.country)}
+                  className={`w-full flex items-center justify-between text-xs py-1.5 px-2 rounded-lg transition-colors border-b border-slate-50 last:border-none text-left ${
+                    isSelected ? 'bg-sky-50 font-bold' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-slate-800">{c.country}</span>
+                    <span className="inline-flex items-center whitespace-nowrap text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono font-bold border border-slate-200 shrink-0">
+                      {sym}&nbsp;{c.currency}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-slate-500">{c.headcount} staff</span>
+                    <span className="font-medium text-slate-700">
+                      Local Avg: {formatCurrency(c.average_salary_local, c.currency)}
+                    </span>
+                    <span className="font-bold text-indigo-700 font-mono">
+                      {formatUSD(c.total_payroll_usd)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -305,25 +409,24 @@ export default function AnalyticsDashboard({ filterOptions }) {
         <div className="mb-4">
           <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
             <ArrowUpDown className="w-4 h-4 text-emerald-600" />
-            <span>Salary Bracket Distribution (Pay Equity Dispersion)</span>
+            <span>Salary Bracket Distribution</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Dispersion of total workforce across normalized annual compensation tiers
+            Workforce dispersion across annual compensation brackets
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-          {salary_bands.map((band, idx) => (
+          {salary_bands.map((band) => (
             <div key={band.range} className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
               <div>
                 <span className="text-xs font-bold text-slate-700">{band.range}</span>
-                <div className="mt-2 text-xl font-extrabold text-slate-900">
+                <div className="mt-2 text-xl font-extrabold text-slate-900 font-mono">
                   {band.count.toLocaleString()}
                 </div>
                 <span className="text-xs font-semibold text-sky-700">{band.percentage}% of workforce</span>
               </div>
               
-              {/* Progress bar */}
               <div className="w-full bg-slate-200 rounded-full h-2 mt-3 overflow-hidden">
                 <div 
                   className="bg-sky-600 h-2 rounded-full transition-all duration-500" 
