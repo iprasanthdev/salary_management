@@ -121,34 +121,7 @@ The HR Manager can immediately answer executive questions via the **Compensation
 
 ---
 
-## 7. Video Demo Walkthrough Script
-
-For recording a 2-3 minute video walkthrough of the software:
-
-1. **Introduction (0:00 - 0:30):**
-   * State the problem: ACME HR managing 10,000 employees across 5 countries in spreadsheets.
-   * Highlight the tech stack: Ruby on Rails 8 API + React 19 with Vite, Tailwind CSS, and Recharts.
-2. **Compensation Analytics (0:30 - 1:15):**
-   * Demonstrate the 4 executive summary cards: Total Headcount (10,000), Total Spend ($), Mean Salary, and Median Salary.
-   * Walk through the Department breakdown and Country distribution charts.
-   * Demonstrate the interactive slicer: select "Engineering" and "India" to show instant sub-millisecond recalculation.
-3. **Employee Directory (1:15 - 2:00):**
-   * Switch to the Employee Directory tab.
-   * Demonstrate the debounced search bar: type "Staff Engineer" or "Alice" to show real-time filtering without UI lag.
-   * Demonstrate sorting by clicking column headers (Compensation, Department, Location).
-   * Show server-side pagination (jump between pages, toggle 25 / 50 / 100 per page).
-4. **CRUD Actions (2:00 - 2:30):**
-   * Click **Add Employee**: enter details, select country (e.g. Germany), notice auto-selection of EUR currency and live USD preview.
-   * Submit and show the success toast notification.
-   * Edit an existing employee's salary and verify the update reflects in both local and USD formats.
-   * Demonstrate the safe **Delete Confirmation Modal**.
-5. **Engineering & Tests (2:30 - 3:00):**
-   * Run `bundle exec rspec` in the terminal to display all 46 passing tests in under 1 second.
-   * Point to the `docs/` folder containing the PRD, architecture, and performance analysis.
-
----
-
-## 8. Artifacts & Documentation Index
+## 7. Artifacts & Documentation Index
 
 As required by the assessment guidelines, comprehensive engineering artifacts are committed in the repository:
 
