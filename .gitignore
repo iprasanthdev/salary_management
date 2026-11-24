@@ -18,6 +18,13 @@ backend/storage/*
 !backend/storage/.keep
 backend/.bundle/
 
+# Rails Keys & Credentials (Never commit)
+backend/config/master.key
+backend/config/credentials/*.key
+backend/config/*.key
+*.key
+.env
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
